@@ -1,0 +1,51 @@
+company,address,city,state,zip,phone,website,revenue,employees
+Northwind Supply,1924 1st Ave,Houston,TX,42098,(428) 342-2679,https://www.northwindsupply.com,175000000,4479
+Blue Ridge Labs,1524 Walnut St,Atlanta,GA,14165,(230) 295-4582,https://www.blueridgelabs.com,61000000,4151
+Cedar Grove Foods,9963 1st Ave,Nashville,TN,36062,(933) 865-9928,https://www.cedargrovefoods.com,109000000,1817
+Harborview Media,7459 Walnut St,Houston,TX,10851,(977) 363-7924,https://www.harborviewmedia.com,89000000,2288
+Summit Peak Logistics,2647 7th Ave,Boston,MA,23396,(294) 589-2584,https://www.summitpeaklogistics.com,93000000,2829
+Brightline Energy,9991 9th Ave,Portland,OR,70217,(749) 327-7201,https://www.brightlineenergy.com,22000000,4534
+Redwood Systems,4903 Park Ave,New York,NY,85674,(396) 921-2139,https://www.redwoodsystems.com,13000000,1878
+Silverlake Dental,4841 3rd St,Dallas,TX,23238,(589) 484-8428,https://www.silverlakedental.com,164000000,3000
+Ironclad Security,2764 Market St,New York,NY,37460,(886) 473-2169,https://www.ironcladsecurity.com,157000000,1413
+Sunspire Analytics,8851 8th St,Denver,CO,70589,(588) 476-4598,https://www.sunspireanalytics.com,177000000,2668
+Lone Star Hardware,1016 8th St,Portland,OR,51347,(610) 474-2084,https://www.lonestarhardware.com,56000000,4658
+Maple Street Bakery,5255 7th Ave,Las Vegas,NV,61856,(858) 669-3340,https://www.maplestreetbakery.com,69000000,1155
+Orchid Health,4140 Cedar St,Nashville,TN,44438,(964) 798-8019,https://www.orchidhealth.com,231000000,4792
+Granite Hill Partners,6643 Market St,Dallas,TX,28131,(721) 705-2489,https://www.granitehillpartners.com,195000000,397
+Seaside Outfitters,1896 5th St,Denver,CO,99192,(632) 810-2040,https://www.seasideoutfitters.com,100000000,3138
+Pinecrest Telecom,9863 Maple Ave,Minneapolis,MN,42953,(766) 211-2876,https://www.pinecresttelecom.com,176000000,4410
+Riverbend Brewing,4471 Broadway,San Jose,CA,48469,(645) 361-8433,https://www.riverbendbrewing.com,2000000,2169
+Apex Auto Group,8301 6th Ave,Minneapolis,MN,23947,(840) 505-9317,https://www.apexautogroup.com,157000000,1641
+Stonebridge Capital,2604 Market St,Denver,CO,80697,(743) 200-6310,https://www.stonebridgecapital.com,127000000,171
+VistaTech,1932 Market St,Chicago,IL,41385,(259) 446-2290,https://www.vistatech.com,23000000,3993
+Copperleaf Design,1233 Cedar St,Los Angeles,CA,26828,(875) 686-3705,https://www.copperleafdesign.com,69000000,4334
+Highland Roofing,7032 7th Ave,Nashville,TN,36365,(930) 519-7537,https://www.highlandroofing.com,173000000,3071
+Prairie Valley Co-op,7277 Pine St,Phoenix,AZ,25860,(453) 430-2049,https://www.prairievalleycoop.com,88000000,184
+MetroPulse,9738 Cedar St,Dallas,TX,87128,(425) 207-2163,https://www.metropulse.com,183000000,494
+Evergreen Clinics,3850 3rd St,Portland,OR,53309,(272) 726-4899,https://www.evergreenclinics.com,73000000,3988
+Skyline Construction,3610 Cedar St,Los Angeles,CA,84847,(790) 684-4981,https://www.skylineconstruction.com,202000000,3886
+Brookstone Finance,6769 7th Ave,San Jose,CA,22704,(874) 641-6804,https://www.brookstonefinance.com,110000000,3379
+Cascade Printing,7751 2nd Ave,San Jose,CA,17944,(612) 945-6559,https://www.cascadeprinting.com,206000000,907
+Horizon Textiles,4173 7th Ave,Austin,TX,80292,(659) 343-7912,https://www.horizontextiles.com,48000000,2293
+Beacon Insurance,7679 8th St,San Francisco,CA,68082,(763) 300-1828,https://www.beaconinsurance.com,168000000,4440
+Fairview Education,341 3rd St,Dallas,TX,31798,(616) 697-8886,https://www.fairvieweducation.com,56000000,3297
+Aspen Ridge Farms,1060 6th Ave,Miami,FL,10282,(599) 471-8454,https://www.aspenridgefarms.com,75000000,3477
+Oakline Consulting,9205 Oak St,Los Angeles,CA,34890,(503) 422-1958,https://www.oaklineconsulting.com,150000000,4453
+Twin Forks Grocers,1098 Broadway,Portland,OR,16572,(798) 688-9238,https://www.twinforksgrocers.com,237000000,4362
+Liberty Data,2679 2nd Ave,Minneapolis,MN,20500,(390) 270-2113,https://www.libertydata.com,174000000,1938
+Cobalt Mining,6715 4th St,Raleigh,NC,42271,(792) 808-1651,https://www.cobaltmining.com,160000000,683
+Aurora Transit,6968 Walnut St,Raleigh,NC,78522,(523) 467-4346,https://www.auroratransit.com,173000000,2585
+Windward Shipping,4010 9th Ave,Miami,FL,27154,(887) 860-5915,https://www.windwardshipping.com,119000000,2602
+Monarch Hospitality,1288 1st Ave,Phoenix,AZ,91416,(776) 302-2200,https://www.monarchhospitality.com,139000000,1758
+Clearwater Utilities,8388 9th Ave,Los Angeles,CA,55745,(270) 450-7054,https://www.clearwaterutilities.com,74000000,1304
+Gulfstream Aviation,7279 Cedar St,Chicago,IL,90173,(869) 741-1128,https://www.gulfstreamaviation.com,172000000,4555
+Pioneer Fitness,5005 4th St,Los Angeles,CA,44664,(318) 309-3546,https://www.pioneerfitness.com,71000000,2320
+Atlas Medical,3550 Broadway,Austin,TX,93130,(470) 717-9004,https://www.atlasmedical.com,66000000,428
+Regal Theaters,1612 Elm St,Houston,TX,15778,(203) 541-3143,https://www.regaltheaters.com,165000000,2157
+Mariner Digital,2747 Maple Ave,Nashville,TN,66057,(774) 209-2832,https://www.marinerdigital.com,21000000,1233
+Polar Innovations,9038 2nd Ave,New York,NY,86350,(765) 351-8041,https://www.polarinnovations.com,34000000,354
+Keystone Legal,5150 Market St,Portland,OR,56898,(415) 898-5088,https://www.keystonelegal.com,172000000,854
+Summerset Resorts,5894 Cedar St,Atlanta,GA,91351,(967) 358-4878,https://www.summersetresorts.com,223000000,1343
+Heritage Pharma,3000 Elm St,Seattle,WA,33509,(954) 540-7745,https://www.heritagepharma.com,207000000,2044
+Midtown Realty,4471 6th Ave,San Jose,CA,60140,(239) 681-4644,https://www.midtownrealty.com,53000000,3782
