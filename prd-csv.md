@@ -11,11 +11,11 @@ Goals
 - Allow basic structural edits (add/remove rows/columns).
 - Allow saving back to disk (UTF-8).
 - Keep UI compact and toolbar-driven.
+- RFC 4180 CSV compliance (quoted fields, escaped quotes, proper formatting).
 
 Non-Goals
-- Full CSV compliance (quoted fields, escaped commas).
 - Rich cell editing or spreadsheet formulas.
-- Very large file performance beyond preview mode.
+- Very large file performance beyond preview mode (use preview mode instead).
 
 Core Features
 1) File Open
@@ -148,9 +148,10 @@ Status Bar
 
 Behavior Details
 - Encoding detection: String(contentsOf:usedEncoding:).
-- CSV parsing: naive split by comma.
+- CSV parsing: RFC 4180 compliant (handles quoted fields, escaped quotes, commas in values).
 - Column widths measured from header and cells; recompute on load and font size change.
 - Preview mode: trigger by file size; display preview indicator.
+- Security-scoped bookmarks: Recent files use bookmarks for persistent file access.
 
 Keyboard Shortcuts
 - Cmd+O: Open
