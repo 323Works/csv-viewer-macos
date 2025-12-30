@@ -607,6 +607,13 @@ struct ContentView: View {
             statusBarView
         }
         .frame(minWidth: Constants.minWindowWidth, minHeight: Constants.minWindowHeight)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // Commit edit when clicking outside cells
+            if editingCell != .none {
+                commitEdit()
+            }
+        }
         .preferredColorScheme(preferDarkMode ? .dark : .light)
         .alert("Save", isPresented: $showOverwriteAlert) {
             Button("Cancel", role: .cancel) {}
