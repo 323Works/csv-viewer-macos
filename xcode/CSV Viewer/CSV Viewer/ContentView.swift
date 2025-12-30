@@ -290,7 +290,7 @@ struct ContentView: View {
             if !fileName.isEmpty {
                 Text(fileName)
                     .font(.system(size: fontSize + 2, weight: .semibold))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.accentColor)
                     .padding(.horizontal)
                     .padding(.bottom, 6)
             }
@@ -304,10 +304,6 @@ struct ContentView: View {
             Text("Rows: \(rows.count)")
             Text("Columns: \(columns.count)")
             Text("Encoding: \(encodingLabel(fileEncoding))")
-            if isPreview {
-                Text("Preview: first \(previewRowLimit) rows")
-            }
-            Spacer()
             Button {
                 NSWorkspace.shared.open(URL(string: "https://www.323works.com")!)
             } label: {
@@ -315,6 +311,10 @@ struct ContentView: View {
             }
             .buttonStyle(.plain)
             .help(Text("Powered by 323 Works, LLC\nhttps://www.323works.com"))
+            if isPreview {
+                Text("Preview: first \(previewRowLimit) rows")
+            }
+            Spacer()
         }
         .foregroundColor(.secondary)
         .padding([.leading, .trailing, .bottom], 8)
