@@ -594,6 +594,14 @@ struct ContentView: View {
     }
 
     private func loadCSV(from url: URL, limitRows: Int?) {
+        // Start accessing security-scoped resource
+        let didStartAccessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if didStartAccessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
         do {
             var encoding: String.Encoding = .utf8
             let text = try String(contentsOf: url, usedEncoding: &encoding)
@@ -776,6 +784,15 @@ struct ContentView: View {
 
     private func saveCSV(to url: URL?) {
         guard let url else { return }
+
+        // Start accessing security-scoped resource
+        let didStartAccessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if didStartAccessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
         var output = ""
         output += columns.joined(separator: ",") + "\n"
         for row in rows {
@@ -1041,16 +1058,24 @@ struct ContentView: View {
 
     private func loadRecentFiles() -> [URL] {
         let defaults = UserDefaults.standard
-        guard let paths = defaults.array(forKey: "csvviewer.recentFiles") as? [String] else {
+        guard let bookmarks = defaults.array(forKey: "csvviewer.recentFiles") as? [Data] else {
             return []
         }
-        return paths.map { URL(fileURLWithPath: $0) }
+        return bookmarks.compactMap { bookmarkData in
+            var isStale = false
+            guard let url = try? URL(resolvingBookmarkData: bookmarkData, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale) else {
+                return nil
+            }
+            return url
+        }
     }
 
     private func saveRecentFiles(_ urls: [URL]) {
         let defaults = UserDefaults.standard
-        let paths = urls.map { $0.path }
-        defaults.set(paths, forKey: "csvviewer.recentFiles")
+        let bookmarks = urls.compactMap { url -> Data? in
+            try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+        }
+        defaults.set(bookmarks, forKey: "csvviewer.recentFiles")
     }
 
     private func clearRecentFiles() {
