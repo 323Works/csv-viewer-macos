@@ -1108,6 +1108,8 @@ struct ContentView: View {
     }
 
     private func handleColumnSelection(at index: Int) {
+        commitEdit() // Commit any active edit before selecting
+
         let modifiers = currentModifierFlags()
         let hasCommand = modifiers.contains(.command)
         let hasShift = modifiers.contains(.shift)
@@ -1135,6 +1137,8 @@ struct ContentView: View {
     }
 
     private func handleRowSelection(at index: Int) {
+        commitEdit() // Commit any active edit before selecting
+
         let modifiers = currentModifierFlags()
         let hasCommand = modifiers.contains(.command)
         let hasShift = modifiers.contains(.shift)
