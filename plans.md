@@ -10,14 +10,15 @@
 - [x] Open Recent with security-scoped bookmarks
 - [x] Sort arrows stacked vertically
 - [x] UI polish (filename accent color, info icon position)
+- [x] **#9: Replace magic numbers with named constants**
+- [x] **#4: Implement 3-level undo/redo stack** (with redo support)
+- [x] **#2: Add error alerts for file operations**
+- [x] **#7: Refactor ContentView** (extracted CSV parsing logic)
+- [x] **#8: Add unit tests for core logic** (CSVParser tests created)
 
 ## 🚧 In Progress
 
-- [ ] **#9: Replace magic numbers with named constants**
-- [ ] **#4: Implement 3-level undo/redo stack**
-- [ ] **#2: Add error alerts for file operations**
-- [ ] **#7: Refactor ContentView (extract components)**
-- [ ] **#8: Add unit tests for core logic**
+- None currently
 
 ## 📋 Backlog
 
