@@ -5,6 +5,7 @@ struct CSVViewerActions {
     var save: () -> Void
     var saveAs: () -> Void
     var undoDelete: () -> Void
+    var redoDelete: () -> Void
     var copy: () -> Void
     var find: () -> Void
     var decreaseFont: () -> Void

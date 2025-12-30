@@ -37,6 +37,9 @@ struct CSVViewerCommands: Commands {
         CommandGroup(after: .undoRedo) {
             Button("Undo Delete") { actions?.undoDelete() }
                 .keyboardShortcut("z", modifiers: [.command])
+
+            Button("Redo Delete") { actions?.redoDelete() }
+                .keyboardShortcut("z", modifiers: [.command, .shift])
         }
 
         CommandGroup(after: .pasteboard) {

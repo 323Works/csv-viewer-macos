@@ -3,9 +3,60 @@ import AppKit
 import UniformTypeIdentifiers
 
 struct ContentView: View {
+    // MARK: - Constants
+    private enum Constants {
+        // Grid Layout
+        static let rowNumberWidth: CGFloat = 52
+        static let rowNumberPadding: CGFloat = 4
+        static let cellPadding: CGFloat = 6
+        static let headerControlWidth: CGFloat = 34
+        static let minColumnWidth: CGFloat = 60
+        static let maxColumnWidth: CGFloat = 520
+        static let minRowHeight: CGFloat = 26
+        static let rowHeightPadding: CGFloat = 14
+
+        // Font Sizes
+        static let defaultFontSize: CGFloat = 13
+        static let minFontSize: CGFloat = 10
+        static let maxFontSize: CGFloat = 22
+        static let fontAdjustmentStep: CGFloat = 1
+        static let fileNameFontOffset: CGFloat = 2
+
+        // Files
+        static let maxRecentFiles = 5
+        static let defaultPreviewRowLimit = 10000
+        static let defaultLargeFileMB = 50
+
+        // Undo/Redo
+        static let maxUndoLevels = 3
+
+        // Toolbar
+        static let toolbarPaddingHorizontal: CGFloat = 16
+        static let toolbarPaddingTop: CGFloat = 10
+        static let toolbarPaddingBottom: CGFloat = 6
+        static let toolbarDividerHeight: CGFloat = 18
+        static let toolbarDividerPadding: CGFloat = 4
+
+        // Window
+        static let minWindowWidth: CGFloat = 700
+        static let minWindowHeight: CGFloat = 420
+
+        // Status Bar
+        static let statusBarSpacing: CGFloat = 12
+        static let statusBarPadding: CGFloat = 8
+
+        // UserDefaults Keys
+        static let previewRowLimitKey = "csvviewer.previewRowLimit"
+        static let largeFileMBKey = "csvviewer.largeFileMB"
+        static let previewLargeFilesKey = "csvviewer.previewLargeFiles"
+        static let recentFilesKey = "csvviewer.recentFiles"
+    }
+
+    // MARK: - Environment
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.openWindow) private var openWindow
 
+    // MARK: - State
     @State private var columns: [String] = []
     @State private var rows: [[String]] = []
     @State private var fileName: String = ""
@@ -22,12 +73,13 @@ struct ContentView: View {
     @State private var showLargeFileAlert = false
     @State private var columnWidths: [CGFloat] = []
     @State private var recentFiles: [URL] = []
-    @State private var fontSize: CGFloat = 13
+    @State private var fontSize: CGFloat = Constants.defaultFontSize
     @State private var wrapLines = false
     @State private var preferDarkMode = false
     @State private var sortColumn: Int?
     @State private var sortAscending = true
     @State private var undoStack: [UndoAction] = []
+    @State private var redoStack: [UndoAction] = []
     @State private var pendingDeleteColumnIndices: [Int] = []
     @State private var showDeleteColumnAlert = false
     @State private var pendingDeleteRowIndices: [Int] = []
@@ -37,10 +89,11 @@ struct ContentView: View {
     @State private var isPreview = false
     @State private var horizontalScrollOffset: CGFloat = 0
 
-    @AppStorage("csvviewer.previewRowLimit") private var previewRowLimit = 10000
-    @AppStorage("csvviewer.largeFileMB") private var largeFileMB = 50
-    @AppStorage("csvviewer.previewLargeFiles") private var previewLargeFiles = true
+    @AppStorage(Constants.previewRowLimitKey) private var previewRowLimit = Constants.defaultPreviewRowLimit
+    @AppStorage(Constants.largeFileMBKey) private var largeFileMB = Constants.defaultLargeFileMB
+    @AppStorage(Constants.previewLargeFilesKey) private var previewLargeFiles = true
 
+    // MARK: - Data Models
     private enum UndoAction {
         case deleteColumns(columns: [DeletedColumn])
         case deleteRows(rows: [DeletedRow])
@@ -57,13 +110,6 @@ struct ContentView: View {
         let row: [String]
     }
 
-    private let rowNumberWidth: CGFloat = 52
-    private let rowNumberPadding: CGFloat = 4
-    private let cellPadding: CGFloat = 6
-    private let headerControlWidth: CGFloat = 34
-    private let minColumnWidth: CGFloat = 60
-    private let maxColumnWidth: CGFloat = 520
-
     private var viewerActions: CSVViewerActions {
         CSVViewerActions(
             open: { openCSV() },
@@ -76,16 +122,17 @@ struct ContentView: View {
             },
             saveAs: { saveCSVAs() },
             undoDelete: { undoDelete() },
+            redoDelete: { redoDelete() },
             copy: { copySelectionToClipboard() },
             find: { openFindWindow() },
-            decreaseFont: { adjustFontSize(-1) },
-            increaseFont: { adjustFontSize(1) },
+            decreaseFont: { adjustFontSize(-Constants.fontAdjustmentStep) },
+            increaseFont: { adjustFontSize(Constants.fontAdjustmentStep) },
             toggleWrap: { wrapLines.toggle() }
         )
     }
 
     private var rowHeight: CGFloat {
-        max(26, fontSize + 14)
+        max(Constants.minRowHeight, fontSize + Constants.rowHeightPadding)
     }
 
     private var contentWidth: CGFloat {
@@ -147,6 +194,15 @@ struct ContentView: View {
             .help(Text("Undo delete"))
             .keyboardShortcut("z", modifiers: [.command])
             .disabled(undoStack.isEmpty)
+
+            Button {
+                redoDelete()
+            } label: {
+                Image(systemName: "arrow.uturn.right")
+            }
+            .help(Text("Redo delete"))
+            .keyboardShortcut("z", modifiers: [.command, .shift])
+            .disabled(redoStack.isEmpty)
 
             Button {
                 copySelectionToClipboard()
@@ -289,7 +345,7 @@ struct ContentView: View {
 
             if !fileName.isEmpty {
                 Text(fileName)
-                    .font(.system(size: fontSize + 2, weight: .semibold))
+                    .font(.system(size: fontSize + Constants.fileNameFontOffset, weight: .semibold))
                     .foregroundColor(.accentColor)
                     .padding(.horizontal)
                     .padding(.bottom, 6)
@@ -300,7 +356,7 @@ struct ContentView: View {
     }
 
     private var statusBarView: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Constants.statusBarSpacing) {
             Text("Rows: \(rows.count)")
             Text("Columns: \(columns.count)")
             Text("Encoding: \(encodingLabel(fileEncoding))")
@@ -317,7 +373,7 @@ struct ContentView: View {
             Spacer()
         }
         .foregroundColor(.secondary)
-        .padding([.leading, .trailing, .bottom], 8)
+        .padding([.leading, .trailing, .bottom], Constants.statusBarPadding)
         .background(Color(NSColor.windowBackgroundColor))
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -334,8 +390,8 @@ struct ContentView: View {
                 Text("\(rowIndex + 1)")
                     .font(.system(size: fontSize, weight: .semibold))
                     .foregroundColor(rowIndexTextColor(row: rowIndex))
-                    .padding(.horizontal, rowNumberPadding)
-                    .frame(width: rowNumberWidth, height: rowHeight, alignment: .trailing)
+                    .padding(.horizontal, Constants.rowNumberPadding)
+                    .frame(width: Constants.rowNumberWidth, height: rowHeight, alignment: .trailing)
                     .background(rowIndexBackground(row: rowIndex))
                     .border(Color.secondary)
                     .contentShape(Rectangle())
@@ -357,7 +413,7 @@ struct ContentView: View {
                             .lineLimit(wrapLines ? nil : 1)
                             .multilineTextAlignment(.leading)
                             .truncationMode(.tail)
-                            .padding(.horizontal, cellPadding)
+                            .padding(.horizontal, Constants.cellPadding)
                             .frame(width: columnWidth(for: colIndex), height: rowHeight, alignment: .leading)
                             .background(cellSelectionColor(row: rowIndex, column: colIndex))
                             .border(Color.secondary)
@@ -403,7 +459,7 @@ struct ContentView: View {
                     .buttonStyle(.plain)
                     .help(Text("Sort column"))
                 }
-                .padding(.horizontal, cellPadding)
+                .padding(.horizontal, Constants.cellPadding)
                 .frame(minWidth: columnWidth(for: index), maxWidth: .infinity, alignment: .leading)
                 .frame(height: rowHeight)
                 .background(headerSelectionColor(for: index))
@@ -427,8 +483,8 @@ struct ContentView: View {
                                 Text("\(rowIndex + 1)")
                                     .font(.system(size: fontSize, weight: .semibold))
                                     .foregroundColor(rowIndexTextColor(row: rowIndex))
-                                    .padding(.horizontal, rowNumberPadding)
-                                    .frame(width: rowNumberWidth, height: rowHeight, alignment: .trailing)
+                                    .padding(.horizontal, Constants.rowNumberPadding)
+                                    .frame(width: Constants.rowNumberWidth, height: rowHeight, alignment: .trailing)
                                     .background(rowIndexBackground(row: rowIndex))
                                     .border(Color.secondary)
                                     .contentShape(Rectangle())
@@ -444,7 +500,7 @@ struct ContentView: View {
                                             .lineLimit(wrapLines ? nil : 1)
                                             .multilineTextAlignment(.leading)
                                             .truncationMode(.tail)
-                                            .padding(.horizontal, cellPadding)
+                                            .padding(.horizontal, Constants.cellPadding)
                                             .frame(width: columnWidth(for: colIndex), height: rowHeight, alignment: .leading)
                                             .background(cellSelectionColor(row: rowIndex, column: colIndex))
                                             .border(Color.secondary)
@@ -460,8 +516,8 @@ struct ContentView: View {
                         HStack(spacing: 0) {
                             Text("#")
                                 .font(.system(size: fontSize, weight: .semibold))
-                                .padding(.horizontal, rowNumberPadding)
-                                .frame(width: rowNumberWidth, height: rowHeight, alignment: .trailing)
+                                .padding(.horizontal, Constants.rowNumberPadding)
+                                .frame(width: Constants.rowNumberWidth, height: rowHeight, alignment: .trailing)
                                 .background(Color.secondary.opacity(0.1))
                                 .border(Color.secondary)
 
@@ -496,7 +552,7 @@ struct ContentView: View {
 
             statusBarView
         }
-        .frame(minWidth: 700, minHeight: 420)
+        .frame(minWidth: Constants.minWindowWidth, minHeight: Constants.minWindowHeight)
         .preferredColorScheme(preferDarkMode ? .dark : .light)
         .alert("Save", isPresented: $showOverwriteAlert) {
             Button("Cancel", role: .cancel) {}
@@ -645,6 +701,7 @@ struct ContentView: View {
             sortColumn = nil
             sortAscending = true
             undoStack = []
+            redoStack = []
             recordRecentFile(url)
         } catch {
             clearData()
@@ -666,6 +723,7 @@ struct ContentView: View {
         sortColumn = nil
         sortAscending = true
         undoStack = []
+        redoStack = []
         isPreview = false
     }
 
@@ -722,7 +780,13 @@ struct ContentView: View {
         lastSelectedColumn = nil
         columnWidths = computeColumnWidths(columns: columns, rows: rows)
         sortColumn = nil
+
+        // Clear redo stack and add to undo with limit
+        redoStack = []
         undoStack.append(.deleteColumns(columns: deleted))
+        if undoStack.count > Constants.maxUndoLevels {
+            undoStack.removeFirst()
+        }
     }
 
     private func deleteSelectedRows(_ indices: [Int]) {
@@ -740,11 +804,24 @@ struct ContentView: View {
         selectedRows = []
         lastSelectedRow = nil
         columnWidths = computeColumnWidths(columns: columns, rows: rows)
+
+        // Clear redo stack and add to undo with limit
+        redoStack = []
         undoStack.append(.deleteRows(rows: deleted))
+        if undoStack.count > Constants.maxUndoLevels {
+            undoStack.removeFirst()
+        }
     }
 
     private func undoDelete() {
         guard let action = undoStack.popLast() else { return }
+
+        // Push to redo stack before undoing
+        redoStack.append(action)
+        if redoStack.count > Constants.maxUndoLevels {
+            redoStack.removeFirst()
+        }
+
         switch action {
         case let .deleteColumns(columnsToRestore):
             let sorted = columnsToRestore.sorted { $0.index < $1.index }
@@ -768,6 +845,45 @@ struct ContentView: View {
             }
             selectedRows = Set(sorted.map { $0.index })
             lastSelectedRow = sorted.last?.index
+        }
+        columnWidths = computeColumnWidths(columns: columns, rows: rows)
+    }
+
+    private func redoDelete() {
+        guard let action = redoStack.popLast() else { return }
+
+        // Push back to undo stack
+        undoStack.append(action)
+        if undoStack.count > Constants.maxUndoLevels {
+            undoStack.removeFirst()
+        }
+
+        // Re-execute the delete
+        switch action {
+        case let .deleteColumns(columnsToDelete):
+            let indices = columnsToDelete.map { $0.index }.sorted(by: >)
+            for index in indices {
+                if columns.indices.contains(index) {
+                    columns.remove(at: index)
+                    rows = rows.map { row in
+                        guard row.indices.contains(index) else { return row }
+                        var updated = row
+                        updated.remove(at: index)
+                        return updated
+                    }
+                }
+            }
+            selectedColumns = []
+            lastSelectedColumn = nil
+        case let .deleteRows(rowsToDelete):
+            let indices = rowsToDelete.map { $0.index }.sorted(by: >)
+            for index in indices {
+                if rows.indices.contains(index) {
+                    rows.remove(at: index)
+                }
+            }
+            selectedRows = []
+            lastSelectedRow = nil
         }
         columnWidths = computeColumnWidths(columns: columns, rows: rows)
     }
@@ -836,15 +952,15 @@ struct ContentView: View {
     }
 
     private func columnWidth(for index: Int) -> CGFloat {
-        guard index >= 0 && index < columnWidths.count else { return minColumnWidth }
+        guard index >= 0 && index < columnWidths.count else { return Constants.minColumnWidth }
         return columnWidths[index]
     }
 
     private func computeColumnWidths(columns: [String], rows: [[String]]) -> [CGFloat] {
         let bodyFont = NSFont.systemFont(ofSize: fontSize)
         let headerFont = NSFont.systemFont(ofSize: fontSize, weight: .semibold)
-        let headerPadding = cellPadding * 2 + headerControlWidth
-        let cellPaddingWidth = cellPadding * 2
+        let headerPadding = Constants.cellPadding * 2 + Constants.headerControlWidth
+        let cellPaddingWidth = Constants.cellPadding * 2
 
         var widths: [CGFloat] = []
         widths.reserveCapacity(columns.count)
@@ -863,7 +979,7 @@ struct ContentView: View {
                     }
                 }
             }
-            let clamped = max(minColumnWidth, min(maxColumnWidth, widest))
+            let clamped = max(Constants.minColumnWidth, min(Constants.maxColumnWidth, widest))
             widths.append(clamped)
         }
         return widths
@@ -995,7 +1111,7 @@ struct ContentView: View {
 
     private func adjustFontSize(_ delta: CGFloat) {
         let updated = fontSize + delta
-        fontSize = max(10, min(22, updated))
+        fontSize = max(Constants.minFontSize, min(Constants.maxFontSize, updated))
     }
 
     private func copySelectionToClipboard() {
@@ -1052,13 +1168,13 @@ struct ContentView: View {
     private func recordRecentFile(_ url: URL) {
         var updated = recentFiles.filter { $0 != url }
         updated.insert(url, at: 0)
-        recentFiles = Array(updated.prefix(5))
+        recentFiles = Array(updated.prefix(Constants.maxRecentFiles))
         saveRecentFiles(recentFiles)
     }
 
     private func loadRecentFiles() -> [URL] {
         let defaults = UserDefaults.standard
-        guard let bookmarks = defaults.array(forKey: "csvviewer.recentFiles") as? [Data] else {
+        guard let bookmarks = defaults.array(forKey: Constants.recentFilesKey) as? [Data] else {
             return []
         }
         return bookmarks.compactMap { bookmarkData in
@@ -1075,7 +1191,7 @@ struct ContentView: View {
         let bookmarks = urls.compactMap { url -> Data? in
             try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
         }
-        defaults.set(bookmarks, forKey: "csvviewer.recentFiles")
+        defaults.set(bookmarks, forKey: Constants.recentFilesKey)
     }
 
     private func clearRecentFiles() {
