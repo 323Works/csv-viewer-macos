@@ -88,6 +88,9 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var isPreview = false
     @State private var horizontalScrollOffset: CGFloat = 0
+    @State private var showErrorAlert = false
+    @State private var errorMessage = ""
+    @State private var errorTitle = ""
 
     @AppStorage(Constants.previewRowLimitKey) private var previewRowLimit = Constants.defaultPreviewRowLimit
     @AppStorage(Constants.largeFileMBKey) private var largeFileMB = Constants.defaultLargeFileMB
@@ -607,6 +610,11 @@ struct ContentView: View {
         } message: {
             Text("This file is large. Load a \(previewRowLimit)-row preview or open the full file?")
         }
+        .alert(errorTitle, isPresented: $showErrorAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage)
+        }
         .sheet(isPresented: $showHelp) {
             HelpView()
         }
@@ -705,7 +713,9 @@ struct ContentView: View {
             recordRecentFile(url)
         } catch {
             clearData()
-            print("Failed to load CSV: \(error)")
+            errorTitle = "Failed to Open File"
+            errorMessage = "Could not open '\(url.lastPathComponent)'.\n\n\(error.localizedDescription)"
+            showErrorAlert = true
         }
     }
 
@@ -921,7 +931,9 @@ struct ContentView: View {
             fileEncoding = .utf8
             recordRecentFile(url)
         } catch {
-            print("Failed to save CSV: \(error)")
+            errorTitle = "Failed to Save File"
+            errorMessage = "Could not save '\(url.lastPathComponent)'.\n\n\(error.localizedDescription)"
+            showErrorAlert = true
         }
     }
 
