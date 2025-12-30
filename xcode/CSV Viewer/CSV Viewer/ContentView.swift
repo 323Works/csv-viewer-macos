@@ -92,6 +92,11 @@ struct ContentView: View {
     @State private var errorMessage = ""
     @State private var errorTitle = ""
 
+    // Cell editing state
+    @State private var editingCell: EditingCell = .none
+    @State private var editingText: String = ""
+    @FocusState private var editFieldIsFocused: Bool
+
     @AppStorage(Constants.previewRowLimitKey) private var previewRowLimit = Constants.defaultPreviewRowLimit
     @AppStorage(Constants.largeFileMBKey) private var largeFileMB = Constants.defaultLargeFileMB
     @AppStorage(Constants.previewLargeFilesKey) private var previewLargeFiles = true
@@ -111,6 +116,12 @@ struct ContentView: View {
     private struct DeletedRow {
         let index: Int
         let row: [String]
+    }
+
+    private enum EditingCell: Equatable {
+        case none
+        case header(column: Int)
+        case dataCell(row: Int, column: Int)
     }
 
     private var viewerActions: CSVViewerActions {
@@ -173,6 +184,7 @@ struct ContentView: View {
             .disabled(recentFiles.isEmpty)
 
             Button {
+                commitEdit() // Auto-commit any active edit before saving
                 if fileURL == nil {
                     saveCSVAs()
                 } else {
@@ -431,16 +443,65 @@ struct ContentView: View {
         .frame(width: contentWidth, alignment: .leading)
     }
 
+    @ViewBuilder
+    private func headerCellText(for index: Int) -> some View {
+        if case .header(let editColumn) = editingCell, editColumn == index {
+            TextField("", text: $editingText)
+                .font(.system(size: fontSize, weight: .semibold))
+                .textFieldStyle(.plain)
+                .focused($editFieldIsFocused)
+                .onSubmit {
+                    commitEdit()
+                }
+        } else {
+            Text(columns[index])
+                .font(.system(size: fontSize, weight: .semibold))
+                .foregroundColor(headerSelectionTextColor(for: index))
+                .lineLimit(nil)
+                .fixedSize(horizontal: true, vertical: false)
+                .multilineTextAlignment(.leading)
+        }
+    }
+
+    @ViewBuilder
+    private func dataCellView(rowIndex: Int, colIndex: Int) -> some View {
+        Group {
+            if case .dataCell(let editRow, let editColumn) = editingCell,
+               editRow == rowIndex, editColumn == colIndex {
+                TextField("", text: $editingText)
+                    .font(.system(size: fontSize))
+                    .textFieldStyle(.plain)
+                    .focused($editFieldIsFocused)
+                    .onSubmit {
+                        moveDown()
+                    }
+            } else {
+                Text(rows[rowIndex][colIndex])
+                    .font(.system(size: fontSize))
+                    .foregroundColor(cellSelectionTextColor(row: rowIndex, column: colIndex))
+                    .lineLimit(wrapLines ? nil : 1)
+                    .multilineTextAlignment(.leading)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding(.horizontal, Constants.cellPadding)
+        .frame(width: columnWidth(for: colIndex), height: rowHeight, alignment: .leading)
+        .background(cellSelectionColor(row: rowIndex, column: colIndex))
+        .border(Color.secondary)
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) {
+            startEditing(.dataCell(row: rowIndex, column: colIndex))
+        }
+        .onTapGesture(count: 1) {
+            handleRowSelection(at: rowIndex)
+        }
+    }
+
     private var headerCells: some View {
         HStack(spacing: 0) {
             ForEach(columns.indices, id: \.self) { index in
                 HStack(spacing: 6) {
-                    Text(columns[index])
-                        .font(.system(size: fontSize, weight: .semibold))
-                        .foregroundColor(headerSelectionTextColor(for: index))
-                        .lineLimit(nil)
-                        .fixedSize(horizontal: true, vertical: false)
-                        .multilineTextAlignment(.leading)
+                    headerCellText(for: index)
                     Spacer(minLength: 4)
                     Button {
                         // Toggle sort: if already sorted by this column, reverse direction
@@ -468,7 +529,10 @@ struct ContentView: View {
                 .background(headerSelectionColor(for: index))
                 .border(Color.secondary)
                 .contentShape(Rectangle())
-                .onTapGesture {
+                .onTapGesture(count: 2) {
+                    startEditing(.header(column: index))
+                }
+                .onTapGesture(count: 1) {
                     handleColumnSelection(at: index)
                 }
             }
@@ -497,20 +561,7 @@ struct ContentView: View {
 
                                 HStack(spacing: 0) {
                                     ForEach(rows[rowIndex].indices, id: \.self) { colIndex in
-                                        Text(rows[rowIndex][colIndex])
-                                            .font(.system(size: fontSize))
-                                            .foregroundColor(cellSelectionTextColor(row: rowIndex, column: colIndex))
-                                            .lineLimit(wrapLines ? nil : 1)
-                                            .multilineTextAlignment(.leading)
-                                            .truncationMode(.tail)
-                                            .padding(.horizontal, Constants.cellPadding)
-                                            .frame(width: columnWidth(for: colIndex), height: rowHeight, alignment: .leading)
-                                            .background(cellSelectionColor(row: rowIndex, column: colIndex))
-                                            .border(Color.secondary)
-                                            .contentShape(Rectangle())
-                                            .onTapGesture {
-                                                handleRowSelection(at: rowIndex)
-                                            }
+                                        dataCellView(rowIndex: rowIndex, colIndex: colIndex)
                                     }
                                 }
                             }
@@ -658,6 +709,8 @@ struct ContentView: View {
     }
 
     private func loadCSV(from url: URL, limitRows: Int?) {
+        cancelEdit() // Cancel any active editing before loading new file
+
         // Start accessing security-scoped resource
         let didStartAccessing = url.startAccessingSecurityScopedResource()
         defer {
@@ -762,6 +815,8 @@ struct ContentView: View {
     }
 
     private func deleteSelectedColumns(_ indices: [Int]) {
+        cancelEdit() // Cancel editing before deletion
+
         let valid = indices.filter { columns.indices.contains($0) }
         guard !valid.isEmpty else { return }
 
@@ -800,6 +855,8 @@ struct ContentView: View {
     }
 
     private func deleteSelectedRows(_ indices: [Int]) {
+        cancelEdit() // Cancel editing before deletion
+
         let valid = indices.filter { rows.indices.contains($0) }
         guard !valid.isEmpty else { return }
 
@@ -938,6 +995,8 @@ struct ContentView: View {
     }
 
     private func sortByColumn(_ index: Int, ascending: Bool) {
+        cancelEdit() // Cancel editing before sorting
+
         guard columns.indices.contains(index) else { return }
         rows.sort { lhs, rhs in
             let left = index < lhs.count ? lhs[index] : ""
@@ -1093,6 +1152,99 @@ struct ContentView: View {
             selectedRows = [index]
         }
         lastSelectedRow = index
+    }
+
+    // MARK: - Cell Editing Functions
+
+    private func startEditing(_ cell: EditingCell) {
+        switch cell {
+        case .none:
+            editingCell = .none
+            editingText = ""
+        case .header(let column):
+            guard columns.indices.contains(column) else { return }
+            editingCell = .header(column: column)
+            editingText = columns[column]
+            editFieldIsFocused = true
+        case .dataCell(let row, let column):
+            guard rows.indices.contains(row),
+                  rows[row].indices.contains(column) else { return }
+            editingCell = .dataCell(row: row, column: column)
+            editingText = rows[row][column]
+            editFieldIsFocused = true
+        }
+    }
+
+    private func commitEdit() {
+        switch editingCell {
+        case .none:
+            break
+        case .header(let column):
+            guard columns.indices.contains(column) else { break }
+            columns[column] = editingText
+            columnWidths = computeColumnWidths(columns: columns, rows: rows)
+        case .dataCell(let row, let column):
+            guard rows.indices.contains(row),
+                  rows[row].indices.contains(column) else { break }
+            rows[row][column] = editingText
+            columnWidths = computeColumnWidths(columns: columns, rows: rows)
+        }
+        editingCell = .none
+        editingText = ""
+    }
+
+    private func cancelEdit() {
+        editingCell = .none
+        editingText = ""
+    }
+
+    private func moveToNextCell(backward: Bool = false) {
+        let currentCell = editingCell
+        commitEdit()
+
+        switch currentCell {
+        case .none:
+            break
+        case .header(let column):
+            let nextColumn = backward ? column - 1 : column + 1
+            if columns.indices.contains(nextColumn) {
+                startEditing(.header(column: nextColumn))
+            } else if !backward {
+                // Wrap to first data cell of first row
+                if !rows.isEmpty {
+                    startEditing(.dataCell(row: 0, column: 0))
+                }
+            }
+        case .dataCell(let row, let column):
+            var nextRow = row
+            var nextColumn = backward ? column - 1 : column + 1
+
+            // Handle column wrapping
+            if nextColumn < 0 {
+                nextColumn = columns.count - 1
+                nextRow -= 1
+            } else if nextColumn >= columns.count {
+                nextColumn = 0
+                nextRow += 1
+            }
+
+            // Check bounds
+            if rows.indices.contains(nextRow) {
+                startEditing(.dataCell(row: nextRow, column: nextColumn))
+            }
+        }
+    }
+
+    private func moveDown() {
+        let currentCell = editingCell
+        commitEdit()
+
+        if case .dataCell(let row, let column) = currentCell {
+            let nextRow = row + 1
+            if rows.indices.contains(nextRow) {
+                startEditing(.dataCell(row: nextRow, column: column))
+            }
+        }
     }
 
     private func deleteColumnsMessage(_ indices: [Int]) -> String {
