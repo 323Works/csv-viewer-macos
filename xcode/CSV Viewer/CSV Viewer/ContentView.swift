@@ -679,7 +679,7 @@ struct ContentView: View {
                 return
             }
 
-            columns = parseCSVLine(headerLine)
+            columns = CSVParser.parseLine(headerLine)
             let bodyLines = Array(lines.dropFirst())
             let limitedLines: [String]
             if let limit = limitRows {
@@ -691,7 +691,7 @@ struct ContentView: View {
             }
 
             rows = limitedLines.map { line in
-                let parts = parseCSVLine(line)
+                let parts = CSVParser.parseLine(line)
                 if parts.count < columns.count {
                     return parts + Array(repeating: "", count: columns.count - parts.count)
                 }
@@ -920,9 +920,9 @@ struct ContentView: View {
         }
 
         var output = ""
-        output += formatCSVLine(columns) + "\n"
+        output += CSVParser.formatLine(columns) + "\n"
         for row in rows {
-            output += formatCSVLine(row) + "\n"
+            output += CSVParser.formatLine(row) + "\n"
         }
         do {
             try output.write(to: url, atomically: true, encoding: .utf8)
@@ -1142,14 +1142,14 @@ struct ContentView: View {
         var lines: [String] = []
         if !columnIndices.isEmpty {
             let header = columnIndices.map { columns[$0] }
-            lines.append(formatCSVLine(header))
+            lines.append(CSVParser.formatLine(header))
         }
         for rowIndex in rowIndices {
             let row = rows[rowIndex]
             let values = columnIndices.map { index in
                 index < row.count ? row[index] : ""
             }
-            lines.append(formatCSVLine(values))
+            lines.append(CSVParser.formatLine(values))
         }
 
         let output = lines.joined(separator: "\n")
@@ -1216,60 +1216,6 @@ struct ContentView: View {
         let sizeBytes = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
         let threshold = largeFileMB * 1024 * 1024
         return sizeBytes >= threshold
-    }
-
-    // RFC 4180 compliant CSV parser
-    private func parseCSVLine(_ line: String) -> [String] {
-        var fields: [String] = []
-        var currentField = ""
-        var insideQuotes = false
-        var index = line.startIndex
-
-        while index < line.endIndex {
-            let char = line[index]
-
-            if char == "\"" {
-                // Check if it's an escaped quote
-                let nextIndex = line.index(after: index)
-                if insideQuotes && nextIndex < line.endIndex && line[nextIndex] == "\"" {
-                    // Escaped quote - add one quote to field
-                    currentField.append("\"")
-                    index = line.index(after: nextIndex)
-                    continue
-                } else {
-                    // Toggle quote mode
-                    insideQuotes.toggle()
-                }
-            } else if char == "," && !insideQuotes {
-                // Field separator
-                fields.append(currentField)
-                currentField = ""
-            } else {
-                currentField.append(char)
-            }
-
-            index = line.index(after: index)
-        }
-
-        // Add the last field
-        fields.append(currentField)
-
-        return fields
-    }
-
-    // RFC 4180 compliant CSV field escaping
-    private func escapeCSVField(_ field: String) -> String {
-        // Fields containing comma, quote, or newline must be quoted
-        if field.contains(",") || field.contains("\"") || field.contains("\n") {
-            // Escape quotes by doubling them
-            let escaped = field.replacingOccurrences(of: "\"", with: "\"\"")
-            return "\"\(escaped)\""
-        }
-        return field
-    }
-
-    private func formatCSVLine(_ fields: [String]) -> String {
-        fields.map { escapeCSVField($0) }.joined(separator: ",")
     }
 }
 
