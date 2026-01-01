@@ -55,6 +55,7 @@ struct ContentView: View {
     // MARK: - Environment
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.openWindow) private var openWindow
+    @EnvironmentObject private var appState: AppState
 
     // MARK: - State
     @State private var columns: [String] = []
@@ -125,7 +126,16 @@ struct ContentView: View {
     }
 
     private var viewerActions: CSVViewerActions {
-        CSVViewerActions(
+        // Wire up save handler for AppDelegate
+        appState.saveHandler = {
+            if fileURL == nil {
+                saveCSVAs()
+            } else {
+                showOverwriteAlert = true
+            }
+        }
+
+        return CSVViewerActions(
             open: { openCSV() },
             save: {
                 if fileURL == nil {
@@ -750,12 +760,18 @@ struct ContentView: View {
                 isPreview = false
             }
 
-            rows = limitedLines.map { line in
-                let parts = CSVParser.parseLine(line)
-                if parts.count < columns.count {
-                    return parts + Array(repeating: "", count: columns.count - parts.count)
+            let parsedRows = limitedLines.map { CSVParser.parseLine($0) }
+            let maxColumns = max(columns.count, parsedRows.map { $0.count }.max() ?? columns.count)
+            if maxColumns > columns.count {
+                let startIndex = columns.count + 1
+                let newHeaders = (startIndex...maxColumns).map { "Column \($0)" }
+                columns.append(contentsOf: newHeaders)
+            }
+            rows = parsedRows.map { parts in
+                if parts.count < maxColumns {
+                    return parts + Array(repeating: "", count: maxColumns - parts.count)
                 }
-                return Array(parts.prefix(columns.count))
+                return parts
             }
 
             fileName = url.lastPathComponent
@@ -771,6 +787,9 @@ struct ContentView: View {
             undoStack = []
             redoStack = []
             recordRecentFile(url)
+            // Clear dirty state after successful load
+            appState.markClean()
+            appState.currentFileName = url.lastPathComponent
         } catch {
             clearData()
             errorTitle = "Failed to Open File"
@@ -795,6 +814,9 @@ struct ContentView: View {
         undoStack = []
         redoStack = []
         isPreview = false
+        // Clear dirty state when clearing data
+        appState.markClean()
+        appState.currentFileName = "Untitled"
     }
 
     private func addColumn(at index: Int?, offset: Int) {
@@ -809,6 +831,7 @@ struct ContentView: View {
         selectedColumns = [insertIndex]
         lastSelectedColumn = insertIndex
         columnWidths = computeColumnWidths(columns: columns, rows: rows)
+        appState.markDirty()
     }
 
     private func addRow(at index: Int?, offset: Int) {
@@ -819,6 +842,7 @@ struct ContentView: View {
         selectedRows = [insertIndex]
         lastSelectedRow = insertIndex
         columnWidths = computeColumnWidths(columns: columns, rows: rows)
+        appState.markDirty()
     }
 
     private func deleteSelectedColumns(_ indices: [Int]) {
@@ -859,6 +883,7 @@ struct ContentView: View {
         if undoStack.count > Constants.maxUndoLevels {
             undoStack.removeFirst()
         }
+        appState.markDirty()
     }
 
     private func deleteSelectedRows(_ indices: [Int]) {
@@ -885,6 +910,7 @@ struct ContentView: View {
         if undoStack.count > Constants.maxUndoLevels {
             undoStack.removeFirst()
         }
+        appState.markDirty()
     }
 
     private func undoDelete() {
@@ -921,6 +947,7 @@ struct ContentView: View {
             lastSelectedRow = sorted.last?.index
         }
         columnWidths = computeColumnWidths(columns: columns, rows: rows)
+        appState.markDirty()
     }
 
     private func redoDelete() {
@@ -960,6 +987,7 @@ struct ContentView: View {
             lastSelectedRow = nil
         }
         columnWidths = computeColumnWidths(columns: columns, rows: rows)
+        appState.markDirty()
     }
 
     private func saveCSVAs() {
@@ -994,6 +1022,9 @@ struct ContentView: View {
             fileURL = url
             fileEncoding = .utf8
             recordRecentFile(url)
+            // Clear dirty state after successful save
+            appState.markClean()
+            appState.currentFileName = url.lastPathComponent
         } catch {
             errorTitle = "Failed to Save File"
             errorMessage = "Could not save '\(url.lastPathComponent)'.\n\n\(error.localizedDescription)"
@@ -1020,6 +1051,7 @@ struct ContentView: View {
         }
         sortColumn = index
         sortAscending = ascending
+        appState.markDirty()
     }
 
     private func sortArrowColor(column: Int, ascending: Bool) -> Color {
@@ -1194,11 +1226,13 @@ struct ContentView: View {
             guard columns.indices.contains(column) else { break }
             columns[column] = editingText
             columnWidths = computeColumnWidths(columns: columns, rows: rows)
+            appState.markDirty()
         case .dataCell(let row, let column):
             guard rows.indices.contains(row),
                   rows[row].indices.contains(column) else { break }
             rows[row][column] = editingText
             columnWidths = computeColumnWidths(columns: columns, rows: rows)
+            appState.markDirty()
         }
         editingCell = .none
         editingText = ""

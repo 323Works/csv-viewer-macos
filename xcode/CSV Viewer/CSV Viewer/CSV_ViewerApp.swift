@@ -2,9 +2,17 @@ import SwiftUI
 
 @main
 struct CSV_ViewerApp: App {
+    @StateObject private var appState = AppState()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(appState)
+                .onAppear {
+                    // Wire up AppDelegate to AppState after initialization
+                    appDelegate.appState = appState
+                }
         }
         Window("Find", id: "find") {
             FindView()

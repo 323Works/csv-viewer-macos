@@ -32,6 +32,38 @@ xcodebuild test -scheme "CSV Viewer" -destination 'platform=macOS'
 
 Note: Test target needs to be added to the Xcode project. CSVParserTests.swift exists in `CSV ViewerTests/` directory but isn't integrated yet.
 
+### Production Build (Create Distributable .app)
+```bash
+cd "xcode/CSV Viewer"
+
+# Create archive
+xcodebuild archive -scheme "CSV Viewer" -archivePath "./CSV_Viewer.xcarchive" -configuration Release
+
+# Export as distributable app
+xcodebuild -exportArchive -archivePath "./CSV_Viewer.xcarchive" -exportPath "../../" -exportOptionsPlist /dev/stdin <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>mac-application</string>
+    <key>signingStyle</key>
+    <string>automatic</string>
+</dict>
+</plist>
+EOF
+
+# Create zip for distribution
+cd ../..
+ditto -c -k --sequesterRsrc --keepParent "CSV Viewer.app" "CSV_Viewer.zip"
+```
+
+This creates:
+- `csv_viewer2/CSV Viewer.app` - Distributable application
+- `csv_viewer2/CSV_Viewer.zip` - Zipped version for easy sharing
+
+**Note:** App is signed with "Sign to Run Locally". Recipients may need to right-click → Open on first launch due to macOS Gatekeeper. For wider distribution, consider notarization with an Apple Developer account.
+
 ## Architecture
 
 ### Core Components
@@ -53,6 +85,19 @@ Note: Test target needs to be added to the Xcode project. CSVParserTests.swift e
 - App entry point with WindowGroup
 - Defines menu commands via `CSVViewerCommands`
 - Uses FocusedValue system to connect menu items to ContentView actions
+- Wires up AppDelegate and injects AppState via environment
+
+**AppState.swift**
+- ObservableObject for shared application state
+- Tracks `hasUnsavedChanges` flag for dirty state
+- Stores `currentFileName` for unsaved changes dialog
+- Provides `saveHandler` closure for AppDelegate to trigger save
+
+**AppDelegate.swift**
+- NSApplicationDelegate for app lifecycle management
+- Implements `applicationShouldTerminate` to intercept quit attempts
+- Shows macOS HIG-compliant unsaved changes dialog
+- Three options: Save, Don't Save, Cancel
 
 **CSVViewerActions.swift**
 - Protocol defining callable actions (open, save, undo, copy, etc.)
@@ -153,6 +198,32 @@ File operations show native alerts with error details:
 @State private var errorMessage = ""
 ```
 
+### Unsaved Changes Warning
+Uses NSApplicationDelegate and shared AppState to track dirty state:
+```swift
+// AppState tracks dirty flag
+@EnvironmentObject private var appState: AppState
+
+// Mark dirty on data modifications
+appState.markDirty()
+
+// Clear dirty on save/load
+appState.markClean()
+```
+
+**Operations that mark dirty:**
+- Cell edits (header or data)
+- Row/column deletions
+- Row/column additions
+- Sorting
+- Undo/redo operations
+
+**Dialog behavior:**
+- Shown when quitting with unsaved changes (Cmd+Q)
+- Three options: Save, Don't Save, Cancel
+- Follows macOS Human Interface Guidelines
+- Save failures prevent quit and maintain dirty state
+
 ## Common Modifications
 
 ### Adding New Toolbar Buttons
@@ -188,11 +259,12 @@ Tests need to be added to Xcode project target to run.
 ## Current Status (see plans.md for details)
 
 **Recently Completed:**
-- Cell editing (double-click, Enter to commit)
+- Cell editing (double-click, Enter to commit, click-outside to commit)
 - 3-level undo/redo with keyboard shortcuts
 - Error alerts for file operations
 - CSV parser extraction and unit tests
 - Constants enum for magic numbers
+- Unsaved changes warning on quit (macOS-style Save/Don't Save/Cancel dialog)
 
 **Next Priorities:**
 - Find/Search feature (#1)

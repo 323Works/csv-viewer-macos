@@ -64,3 +64,9 @@ fastlane/test_output
 
 # macOS
 .DS_Store
+
+# Production build artifacts
+*.xcarchive
+CSV Viewer.app
+CSV_Viewer.zip
+CSV_Viewer_Export/

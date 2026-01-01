@@ -15,6 +15,9 @@
 - [x] **#2: Add error alerts for file operations**
 - [x] **#7: Refactor ContentView** (extracted CSV parsing logic)
 - [x] **#8: Add unit tests for core logic** (CSVParser tests created)
+- [x] **#3: Cell editing** (double-click, Enter to commit, click-outside to commit)
+- [x] **Unsaved changes warning** (macOS-style dialog on quit with Save/Don't Save/Cancel)
+- [x] **Auto-extend headers on load** (prevent truncation when rows have extra columns)
 
 ## 🚧 In Progress
 
@@ -29,18 +32,11 @@
   - Highlight matches
   - Navigate between results (⌘G / ⌘⇧G)
 
-- [ ] **#3: Cell editing**
-  - Double-click to edit cell values
+- [ ] **#3: Cell editing keyboard navigation** (remaining items)
   - Tab to move between cells
-  - Enter to commit changes
-  - Escape to cancel
+  - Escape to cancel editing
 
 ### Medium Priority
-
-- [ ] **#5: Multi-line CSV field handling**
-  - Parser already supports newlines in quoted fields
-  - Need to test and fix display issues
-  - Ensure proper rendering in grid
 
 - [ ] **#6: Export formats**
   - TSV (tab-separated values)
@@ -49,6 +45,11 @@
   - Excel-compatible format
 
 ### Nice to Have
+
+- [ ] **#5: Multi-line CSV field handling** (low frequency, defer unless needed)
+  - Parser already supports newlines in quoted fields
+  - Need to test and fix display issues
+  - Ensure proper rendering in grid
 
 - [ ] **#10: Column filtering**
   - Filter rows by column criteria
@@ -83,6 +84,7 @@
   - Virtual scrolling for 100k+ rows
   - Lazy column width calculation
   - Memory profiling
+- [ ] Streamed CSV loading for preview (avoid full-file read)
 
 ### Code Quality
 
@@ -100,7 +102,7 @@
 - [ ] Implement proper MVVM pattern
 
 ### Testing
-- [ ] CSV parser unit tests
+- [ ] Integrate CSVParserTests into Xcode test target
 - [ ] Sorting logic tests
 - [ ] Selection behavior tests
 - [ ] File I/O integration tests
@@ -115,10 +117,10 @@
 ## 📝 Notes
 
 ### Current Focus
-Working on foundational improvements (#9, #4, #2, #7, #8) to establish a solid codebase before adding new features.
+Foundational improvements complete (#9, #4, #2, #7, #8, #3, unsaved changes). Ready for new features.
 
 ### Next Sprint
-After current work is complete, prioritize Find feature (#1) and Cell editing (#3) as they provide the most user value.
+Prioritize Find feature (#1) as it provides the most user value. Consider Tab/Escape navigation (#3 remaining) for improved editing UX.
 
 ### Long-term Vision
 Transform into a full-featured lightweight CSV editor that can replace Excel for basic CSV tasks while maintaining speed and simplicity.
