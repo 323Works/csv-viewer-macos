@@ -96,7 +96,7 @@ struct ContentView: View {
     // Cell editing state
     @State private var editingCell: EditingCell = .none
     @State private var editingText: String = ""
-    @FocusState private var editFieldIsFocused: Bool
+    @State private var editFieldIsFocused = false
 
     @AppStorage(Constants.previewRowLimitKey) private var previewRowLimit = Constants.defaultPreviewRowLimit
     @AppStorage(Constants.largeFileMBKey) private var largeFileMB = Constants.defaultLargeFileMB
@@ -456,13 +456,14 @@ struct ContentView: View {
     @ViewBuilder
     private func headerCellText(for index: Int) -> some View {
         if case .header(let editColumn) = editingCell, editColumn == index {
-            TextField("", text: $editingText)
-                .font(.system(size: fontSize, weight: .semibold))
-                .textFieldStyle(.plain)
-                .focused($editFieldIsFocused)
-                .onSubmit {
-                    commitEdit()
-                }
+            EditingTextField(
+                text: $editingText,
+                isFocused: $editFieldIsFocused,
+                font: NSFont.systemFont(ofSize: fontSize, weight: .semibold),
+                onCommit: { commitEdit() },
+                onTab: { backward in moveToNextCell(backward: backward) },
+                onCancel: { cancelEdit() }
+            )
         } else {
             Text(columns[index])
                 .font(.system(size: fontSize, weight: .semibold))
@@ -478,13 +479,14 @@ struct ContentView: View {
         Group {
             if case .dataCell(let editRow, let editColumn) = editingCell,
                editRow == rowIndex, editColumn == colIndex {
-                TextField("", text: $editingText)
-                    .font(.system(size: fontSize))
-                    .textFieldStyle(.plain)
-                    .focused($editFieldIsFocused)
-                    .onSubmit {
-                        moveDown()
-                    }
+                EditingTextField(
+                    text: $editingText,
+                    isFocused: $editFieldIsFocused,
+                    font: NSFont.systemFont(ofSize: fontSize),
+                    onCommit: { moveDown() },
+                    onTab: { backward in moveToNextCell(backward: backward) },
+                    onCancel: { cancelEdit() }
+                )
             } else {
                 Text(rows[rowIndex][colIndex])
                     .font(.system(size: fontSize))
@@ -1236,11 +1238,13 @@ struct ContentView: View {
         }
         editingCell = .none
         editingText = ""
+        editFieldIsFocused = false
     }
 
     private func cancelEdit() {
         editingCell = .none
         editingText = ""
+        editFieldIsFocused = false
     }
 
     private func moveToNextCell(backward: Bool = false) {

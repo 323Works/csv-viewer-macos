@@ -30,7 +30,7 @@ cd "xcode/CSV Viewer"
 xcodebuild test -scheme "CSV Viewer" -destination 'platform=macOS'
 ```
 
-Note: Test target needs to be added to the Xcode project. CSVParserTests.swift exists in `CSV ViewerTests/` directory but isn't integrated yet.
+Note: CSVParserTests.swift is wired to the CSV ViewerTests target. If tests aren't running, ensure the scheme includes CSV ViewerTests.
 
 ### Production Build (Create Distributable .app)
 ```bash

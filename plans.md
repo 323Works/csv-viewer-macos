@@ -16,8 +16,10 @@
 - [x] **#7: Refactor ContentView** (extracted CSV parsing logic)
 - [x] **#8: Add unit tests for core logic** (CSVParser tests created)
 - [x] **#3: Cell editing** (double-click, Enter to commit, click-outside to commit)
+- [x] **#3: Cell editing keyboard navigation** (Tab/Escape + shift-tab)
 - [x] **Unsaved changes warning** (macOS-style dialog on quit with Save/Don't Save/Cancel)
 - [x] **Auto-extend headers on load** (prevent truncation when rows have extra columns)
+- [x] **Integrate CSVParserTests into Xcode test target**
 
 ## 🚧 In Progress
 
@@ -31,10 +33,6 @@
   - Search within cells
   - Highlight matches
   - Navigate between results (⌘G / ⌘⇧G)
-
-- [ ] **#3: Cell editing keyboard navigation** (remaining items)
-  - Tab to move between cells
-  - Escape to cancel editing
 
 ### Medium Priority
 
@@ -102,7 +100,6 @@
 - [ ] Implement proper MVVM pattern
 
 ### Testing
-- [ ] Integrate CSVParserTests into Xcode test target
 - [ ] Sorting logic tests
 - [ ] Selection behavior tests
 - [ ] File I/O integration tests
