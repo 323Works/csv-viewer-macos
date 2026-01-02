@@ -20,6 +20,7 @@
 - [x] **Unsaved changes warning** (macOS-style dialog on quit with Save/Don't Save/Cancel)
 - [x] **Auto-extend headers on load** (prevent truncation when rows have extra columns)
 - [x] **Integrate CSVParserTests into Xcode test target**
+- [x] **#1: Find/Search feature** (substring, case-insensitive, column-scoped if selected)
 
 ## 🚧 In Progress
 
@@ -28,11 +29,6 @@
 ## 📋 Backlog
 
 ### High Priority
-
-- [ ] **#1: Find/Search feature**
-  - Search within cells
-  - Highlight matches
-  - Navigate between results (⌘G / ⌘⇧G)
 
 ### Medium Priority
 

@@ -3,12 +3,14 @@ import SwiftUI
 @main
 struct CSV_ViewerApp: App {
     @StateObject private var appState = AppState()
+    @StateObject private var searchState = SearchState()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
+                .environmentObject(searchState)
                 .onAppear {
                     // Wire up AppDelegate to AppState after initialization
                     appDelegate.appState = appState
@@ -16,6 +18,7 @@ struct CSV_ViewerApp: App {
         }
         Window("Find", id: "find") {
             FindView()
+                .environmentObject(searchState)
         }
         .defaultSize(width: 420, height: 260)
         .windowResizability(.contentSize)
@@ -58,6 +61,12 @@ struct CSVViewerCommands: Commands {
         CommandMenu("Find") {
             Button("Find...") { actions?.find() }
                 .keyboardShortcut("f", modifiers: [.command])
+
+            Button("Find Next") { actions?.findNext() }
+                .keyboardShortcut("g", modifiers: [.command])
+
+            Button("Find Previous") { actions?.findPrevious() }
+                .keyboardShortcut("g", modifiers: [.command, .shift])
         }
 
         CommandMenu("View") {

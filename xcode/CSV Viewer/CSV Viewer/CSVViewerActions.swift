@@ -8,6 +8,8 @@ struct CSVViewerActions {
     var redoDelete: () -> Void
     var copy: () -> Void
     var find: () -> Void
+    var findNext: () -> Void
+    var findPrevious: () -> Void
     var decreaseFont: () -> Void
     var increaseFont: () -> Void
     var toggleWrap: () -> Void

@@ -56,6 +56,7 @@ struct ContentView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.openWindow) private var openWindow
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var searchState: SearchState
 
     // MARK: - State
     @State private var columns: [String] = []
@@ -92,6 +93,7 @@ struct ContentView: View {
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
     @State private var errorTitle = ""
+    @State private var lastSearchSignature = ""
 
     // Cell editing state
     @State private var editingCell: EditingCell = .none
@@ -149,6 +151,8 @@ struct ContentView: View {
             redoDelete: { redoDelete() },
             copy: { copySelectionToClipboard() },
             find: { openFindWindow() },
+            findNext: { findNext() },
+            findPrevious: { findPrevious() },
             decreaseFont: { adjustFontSize(-Constants.fontAdjustmentStep) },
             increaseFont: { adjustFontSize(Constants.fontAdjustmentStep) },
             toggleWrap: { wrapLines.toggle() }
@@ -239,13 +243,12 @@ struct ContentView: View {
             .disabled(columns.isEmpty || rows.isEmpty)
 
             Button {
-                // Placeholder for future search UI.
+                openFindWindow()
             } label: {
                 Image(systemName: "magnifyingglass")
             }
-            .help(Text("Find (coming soon)"))
+            .help(Text("Find"))
             .keyboardShortcut("f", modifiers: [.command])
-            .disabled(true)
 
             Button {
                 adjustFontSize(-1)
@@ -498,6 +501,7 @@ struct ContentView: View {
         }
         .padding(.horizontal, Constants.cellPadding)
         .frame(width: columnWidth(for: colIndex), height: rowHeight, alignment: .leading)
+        .id(SearchMatch(row: rowIndex, column: colIndex))
         .background(cellSelectionColor(row: rowIndex, column: colIndex))
         .border(Color.secondary)
         .contentShape(Rectangle())
@@ -594,6 +598,12 @@ struct ContentView: View {
                 }
             }
             .padding([.leading, .trailing])
+            .onChange(of: searchState.currentIndex) {
+                scrollToCurrentMatch(using: scrollProxy)
+            }
+            .onChange(of: searchState.matches) {
+                scrollToCurrentMatch(using: scrollProxy)
+            }
         }
     }
 
@@ -701,10 +711,38 @@ struct ContentView: View {
         .onChange(of: fontSize) {
             columnWidths = computeColumnWidths(columns: columns, rows: rows)
         }
+        .onChange(of: searchState.query) {
+            updateSearchResults()
+        }
+        .onChange(of: rows) {
+            updateSearchResults()
+        }
+        .onChange(of: columns) {
+            updateSearchResults()
+        }
+        .onChange(of: selectedColumns) {
+            updateSearchResults()
+        }
     }
 
     private func openFindWindow() {
         openWindow(id: "find")
+    }
+
+    private func findNext() {
+        if searchState.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            openFindWindow()
+            return
+        }
+        searchState.advance(forward: true)
+    }
+
+    private func findPrevious() {
+        if searchState.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            openFindWindow()
+            return
+        }
+        searchState.advance(forward: false)
     }
 
     private func openCSV() {
@@ -1103,6 +1141,9 @@ struct ContentView: View {
         if rowSelected || columnSelected {
             return Color.accentColor.opacity(0.6)
         }
+        if let matchColor = searchMatchColor(row: row, column: column) {
+            return matchColor
+        }
         return .clear
     }
 
@@ -1139,6 +1180,61 @@ struct ContentView: View {
             return colorScheme == .light ? .black : .white
         }
         return .secondary
+    }
+
+    private func searchMatchColor(row: Int, column: Int) -> Color? {
+        let match = SearchMatch(row: row, column: column)
+        guard searchState.matchSet.contains(match) else { return nil }
+        if searchState.currentMatch == match {
+            return Color.orange.opacity(0.55)
+        }
+        return Color.yellow.opacity(0.35)
+    }
+
+    private func scrollToCurrentMatch(using scrollProxy: ScrollViewProxy) {
+        guard let match = searchState.currentMatch else { return }
+        withAnimation {
+            scrollProxy.scrollTo(match, anchor: .center)
+        }
+    }
+
+    private func updateSearchResults() {
+        let rawQuery = searchState.query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let scopedColumns = selectedColumns.isEmpty ? Array(columns.indices) : selectedColumns.sorted()
+        searchState.isColumnScoped = !selectedColumns.isEmpty
+
+        guard !rawQuery.isEmpty, !rows.isEmpty, !columns.isEmpty else {
+            searchState.matches = []
+            searchState.matchSet = []
+            searchState.currentIndex = 0
+            lastSearchSignature = ""
+            return
+        }
+
+        let signature = "\(rawQuery.lowercased())|\(scopedColumns.map(String.init).joined(separator: ","))"
+        let shouldResetIndex = signature != lastSearchSignature
+        lastSearchSignature = signature
+
+        var matches: [SearchMatch] = []
+        matches.reserveCapacity(rows.count)
+        for (rowIndex, row) in rows.enumerated() {
+            for columnIndex in scopedColumns {
+                guard columnIndex < row.count else { continue }
+                if row[columnIndex].range(of: rawQuery, options: [.caseInsensitive, .diacriticInsensitive]) != nil {
+                    matches.append(SearchMatch(row: rowIndex, column: columnIndex))
+                }
+            }
+        }
+
+        searchState.matches = matches
+        searchState.matchSet = Set(matches)
+        if matches.isEmpty {
+            searchState.currentIndex = 0
+        } else if shouldResetIndex {
+            searchState.currentIndex = 0
+        } else {
+            searchState.currentIndex = min(searchState.currentIndex, matches.count - 1)
+        }
     }
 
     private func handleColumnSelection(at index: Int) {

@@ -48,6 +48,8 @@ struct HelpView: View {
                     shortcutRow("Undo Delete", "⌘Z")
                     shortcutRow("Copy Selection", "⌘C")
                     shortcutRow("Find", "⌘F")
+                    shortcutRow("Find Next", "⌘G")
+                    shortcutRow("Find Previous", "⌘⇧G")
                     shortcutRow("Toggle Wrap", "⌘L")
                     shortcutRow("Font Size", "⌘+  /  ⌘−")
                 }
