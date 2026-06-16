@@ -7,7 +7,7 @@ struct CSV_ViewerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(AppBuild.windowTitle) {
             ContentView()
                 .environmentObject(appState)
                 .environmentObject(searchState)

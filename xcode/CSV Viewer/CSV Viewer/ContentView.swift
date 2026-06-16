@@ -40,6 +40,9 @@ struct ContentView: View {
         // Window
         static let minWindowWidth: CGFloat = 700
         static let minWindowHeight: CGFloat = 420
+        static let emptyStateMaxWidth: CGFloat = 720
+        static let emptyStateMinHeight: CGFloat = 280
+        static let emptyStateCornerRadius: CGFloat = 20
 
         // Status Bar
         static let statusBarSpacing: CGFloat = 12
@@ -94,6 +97,10 @@ struct ContentView: View {
     @State private var errorMessage = ""
     @State private var errorTitle = ""
     @State private var lastSearchSignature = ""
+    @State private var isFileDropTargeted = false
+    @State private var filterText = ""
+    @State private var activeCell: SearchMatch?
+    @FocusState private var filterFieldFocused: Bool
 
     // Cell editing state
     @State private var editingCell: EditingCell = .none
@@ -167,6 +174,34 @@ struct ContentView: View {
         columnWidths.reduce(0, +)
     }
 
+    private var hasLoadedDocument: Bool {
+        fileURL != nil || !columns.isEmpty
+    }
+
+    private var filteredRowIndices: [Int] {
+        let query = filterText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return Array(rows.indices) }
+
+        return rows.indices.filter { rowIndex in
+            rows[rowIndex].contains { value in
+                value.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+            }
+        }
+    }
+
+    private var isFilterActive: Bool {
+        !filterText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var focusedDataCell: SearchMatch? {
+        guard let activeCell,
+              rows.indices.contains(activeCell.row),
+              columns.indices.contains(activeCell.column) else {
+            return nil
+        }
+        return activeCell
+    }
+
     private var toolbarView: some View {
         HStack {
             Button {
@@ -174,7 +209,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "folder")
             }
-            .help(Text("Open CSV..."))
+            .commandTooltip("Open CSV file (⌘O)", anchor: .leading)
             .keyboardShortcut("o", modifiers: [.command])
 
             Menu {
@@ -194,7 +229,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "clock.arrow.circlepath")
             }
-            .help(Text("Open Recent"))
+            .commandTooltip("Open recent file")
             .disabled(recentFiles.isEmpty)
 
             Button {
@@ -207,7 +242,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "square.and.arrow.down")
             }
-            .help(Text("Save CSV"))
+            .commandTooltip("Save CSV (⌘S)")
             .disabled(columns.isEmpty)
             .keyboardShortcut("s", modifiers: [.command])
 
@@ -220,7 +255,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "arrow.uturn.left")
             }
-            .help(Text("Undo delete"))
+            .commandTooltip("Undo delete (⌘Z)")
             .keyboardShortcut("z", modifiers: [.command])
             .disabled(undoStack.isEmpty)
 
@@ -229,7 +264,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "arrow.uturn.right")
             }
-            .help(Text("Redo delete"))
+            .commandTooltip("Redo delete (⌘⇧Z)")
             .keyboardShortcut("z", modifiers: [.command, .shift])
             .disabled(redoStack.isEmpty)
 
@@ -238,7 +273,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "doc.on.doc")
             }
-            .help(Text("Copy selection"))
+            .commandTooltip("Copy selection as CSV (⌘C)")
             .keyboardShortcut("c", modifiers: [.command])
             .disabled(columns.isEmpty || rows.isEmpty)
 
@@ -247,7 +282,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "magnifyingglass")
             }
-            .help(Text("Find"))
+            .commandTooltip("Find text (⌘F)")
             .keyboardShortcut("f", modifiers: [.command])
 
             Button {
@@ -255,7 +290,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "textformat.size.smaller")
             }
-            .help(Text("Decrease font size"))
+            .commandTooltip("Decrease font size (⌘-)")
             .keyboardShortcut("-", modifiers: [.command])
 
             Button {
@@ -263,7 +298,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "textformat.size.larger")
             }
-            .help(Text("Increase font size"))
+            .commandTooltip("Increase font size (⌘=)")
             .keyboardShortcut("=", modifiers: [.command])
 
             Button {
@@ -271,7 +306,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: wrapLines ? "text.justify" : "text.justify.left")
             }
-            .help(Text(wrapLines ? "Disable line wrapping" : "Enable line wrapping"))
+            .commandTooltip(wrapLines ? "Disable line wrapping (⌘L)" : "Enable line wrapping (⌘L)")
             .keyboardShortcut("l", modifiers: [.command])
 
             Button {
@@ -292,7 +327,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "arrow.left.to.line")
             }
-            .help(Text("Add column to the left of selection"))
+            .commandTooltip("Insert column to the left of selected column")
             .disabled(lastSelectedColumn == nil)
 
             Button {
@@ -300,7 +335,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "arrow.right.to.line")
             }
-            .help(Text("Add column to the right of selection"))
+            .commandTooltip("Insert column to the right of selected column")
             .disabled(lastSelectedColumn == nil)
 
             Button {
@@ -308,7 +343,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "arrow.up.to.line")
             }
-            .help(Text("Add row above selection"))
+            .commandTooltip("Insert row above selected row")
             .disabled(lastSelectedRow == nil)
 
             Button {
@@ -316,7 +351,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "arrow.down.to.line")
             }
-            .help(Text("Add row below selection"))
+            .commandTooltip("Insert row below selected row")
             .disabled(lastSelectedRow == nil)
 
             Button {
@@ -325,7 +360,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "trash")
             }
-            .help(Text("Delete selected column"))
+            .commandTooltip("Delete selected column(s)")
             .disabled(selectedColumns.isEmpty)
 
             Button {
@@ -334,7 +369,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "trash.slash")
             }
-            .help(Text("Delete selected row"))
+            .commandTooltip("Delete selected row(s)")
             .disabled(selectedRows.isEmpty)
 
             Spacer()
@@ -344,21 +379,21 @@ struct ContentView: View {
             } label: {
                 Image(systemName: preferDarkMode ? "sun.max.fill" : "moon.fill")
             }
-            .help(Text(preferDarkMode ? "Switch to light mode" : "Switch to dark mode"))
+            .commandTooltip(preferDarkMode ? "Switch to light mode" : "Switch to dark mode")
 
             Button {
                 showSettings = true
             } label: {
                 Image(systemName: "gearshape")
             }
-            .help(Text("Settings"))
+            .commandTooltip("Open settings")
 
             Button {
                 showHelp = true
             } label: {
                 Image(systemName: "questionmark.circle")
             }
-            .help(Text("Help"))
+            .commandTooltip("Open help")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -366,7 +401,6 @@ struct ContentView: View {
     private var topBarView: some View {
         VStack(alignment: .leading, spacing: 0) {
             toolbarView
-                .focusedSceneValue(\.csvViewerActions, viewerActions)
                 .padding(.horizontal)
                 .padding(.top, 10)
                 .padding(.bottom, 6)
@@ -378,14 +412,55 @@ struct ContentView: View {
                     .padding(.horizontal)
                     .padding(.bottom, 6)
             }
+
+            if hasLoadedDocument {
+                filterBarView
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+            }
         }
         .background(Color(NSColor.windowBackgroundColor))
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var filterBarView: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+                .foregroundColor(.secondary)
+
+            TextField("Filter visible rows", text: $filterText)
+                .textFieldStyle(.roundedBorder)
+                .focused($filterFieldFocused)
+                .frame(maxWidth: 320)
+
+            Button {
+                filterText = ""
+                filterFieldFocused = false
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(.secondary)
+            .commandTooltip("Clear row filter")
+            .disabled(filterText.isEmpty)
+
+            if isFilterActive {
+                Text("\(filteredRowIndices.count) of \(rows.count) rows")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+        }
+    }
+
     private var statusBarView: some View {
         HStack(spacing: Constants.statusBarSpacing) {
-            Text("Rows: \(rows.count)")
+            if isFilterActive {
+                Text("Rows: \(filteredRowIndices.count) visible of \(rows.count)")
+            } else {
+                Text("Rows: \(rows.count)")
+            }
             Text("Columns: \(columns.count)")
             Text("Encoding: \(encodingLabel(fileEncoding))")
             Button {
@@ -407,9 +482,53 @@ struct ContentView: View {
     }
 
     private var emptyView: some View {
-        Text("Open a CSV file to view it.")
-            .foregroundColor(.secondary)
-            .padding()
+        VStack {
+            Spacer(minLength: 32)
+
+            Button {
+                openCSV()
+            } label: {
+                VStack(spacing: 14) {
+                    Image(systemName: "tray.and.arrow.down")
+                        .font(.system(size: 40, weight: .semibold))
+                        .foregroundColor(isFileDropTargeted ? .accentColor : .secondary)
+
+                    Text("Drag your CSV file here")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundColor(.primary)
+
+                    Text("or click in this area to choose a file")
+                        .font(.system(size: 15))
+                        .foregroundColor(.secondary)
+
+                    Text("Supports .csv files")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.secondary.opacity(0.08), in: Capsule())
+                }
+                .frame(maxWidth: .infinity, minHeight: Constants.emptyStateMinHeight)
+                .padding(.horizontal, 36)
+                .background(
+                    RoundedRectangle(cornerRadius: Constants.emptyStateCornerRadius)
+                        .fill(isFileDropTargeted ? Color.accentColor.opacity(0.08) : Color.secondary.opacity(0.05))
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: Constants.emptyStateCornerRadius)
+                        .stroke(
+                            isFileDropTargeted ? Color.accentColor : Color.secondary.opacity(0.25),
+                            style: StrokeStyle(lineWidth: isFileDropTargeted ? 4 : 2, dash: [10, 8])
+                        )
+                }
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: Constants.emptyStateMaxWidth)
+            .padding(.horizontal, 24)
+
+            Spacer(minLength: 32)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var rowNumbersColumn: some View {
@@ -478,6 +597,25 @@ struct ContentView: View {
     }
 
     @ViewBuilder
+    private func dataCellTextView(rowIndex: Int, colIndex: Int) -> some View {
+        let value = rows[rowIndex][colIndex]
+        if isFilterActive, filterRange(in: value) != nil {
+            Text(filterHighlightedAttributedString(for: value, row: rowIndex, column: colIndex))
+                .font(.system(size: fontSize))
+                .lineLimit(wrapLines ? nil : 1)
+                .multilineTextAlignment(.leading)
+                .truncationMode(.tail)
+        } else {
+            Text(value)
+                .font(.system(size: fontSize))
+                .foregroundColor(cellSelectionTextColor(row: rowIndex, column: colIndex))
+                .lineLimit(wrapLines ? nil : 1)
+                .multilineTextAlignment(.leading)
+                .truncationMode(.tail)
+        }
+    }
+
+    @ViewBuilder
     private func dataCellView(rowIndex: Int, colIndex: Int) -> some View {
         Group {
             if case .dataCell(let editRow, let editColumn) = editingCell,
@@ -491,12 +629,7 @@ struct ContentView: View {
                     onCancel: { cancelEdit() }
                 )
             } else {
-                Text(rows[rowIndex][colIndex])
-                    .font(.system(size: fontSize))
-                    .foregroundColor(cellSelectionTextColor(row: rowIndex, column: colIndex))
-                    .lineLimit(wrapLines ? nil : 1)
-                    .multilineTextAlignment(.leading)
-                    .truncationMode(.tail)
+                dataCellTextView(rowIndex: rowIndex, colIndex: colIndex)
             }
         }
         .padding(.horizontal, Constants.cellPadding)
@@ -506,9 +639,11 @@ struct ContentView: View {
         .border(Color.secondary)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) {
+            activeCell = SearchMatch(row: rowIndex, column: colIndex)
             startEditing(.dataCell(row: rowIndex, column: colIndex))
         }
         .onTapGesture(count: 1) {
+            activeCell = SearchMatch(row: rowIndex, column: colIndex)
             handleRowSelection(at: rowIndex)
         }
     }
@@ -561,7 +696,7 @@ struct ContentView: View {
             ScrollView([.horizontal, .vertical], showsIndicators: true) {
                 LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                     Section {
-                        ForEach(rows.indices, id: \.self) { rowIndex in
+                        ForEach(filteredRowIndices, id: \.self) { rowIndex in
                             HStack(spacing: 0) {
                                 Text("\(rowIndex + 1)")
                                     .font(.system(size: fontSize, weight: .semibold))
@@ -572,6 +707,9 @@ struct ContentView: View {
                                     .border(Color.secondary)
                                     .contentShape(Rectangle())
                                     .onTapGesture {
+                                        if columns.indices.contains(0) {
+                                            activeCell = SearchMatch(row: rowIndex, column: 0)
+                                        }
                                         handleRowSelection(at: rowIndex)
                                     }
 
@@ -596,7 +734,9 @@ struct ContentView: View {
                         .background(Color(NSColor.windowBackgroundColor))
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
+            .defaultScrollAnchor(.topLeading)
             .padding([.leading, .trailing])
             .onChange(of: searchState.currentIndex) {
                 scrollToCurrentMatch(using: scrollProxy)
@@ -604,16 +744,33 @@ struct ContentView: View {
             .onChange(of: searchState.matches) {
                 scrollToCurrentMatch(using: scrollProxy)
             }
+            .onChange(of: activeCell) {
+                if let activeCell {
+                    withAnimation {
+                        scrollProxy.scrollTo(activeCell, anchor: .center)
+                    }
+                }
+            }
         }
     }
 
     private var mainContent: some View {
         Group {
-            if !rows.isEmpty {
+            if hasLoadedDocument {
                 gridView
             } else {
                 emptyView
             }
+        }
+        .overlay {
+            if isFileDropTargeted, hasLoadedDocument {
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [8]))
+                    .padding(12)
+            }
+        }
+        .onDrop(of: [UTType.fileURL], isTargeted: $isFileDropTargeted) { providers in
+            handleFileDrop(providers: providers)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -629,7 +786,13 @@ struct ContentView: View {
             statusBarView
         }
         .frame(minWidth: Constants.minWindowWidth, minHeight: Constants.minWindowHeight)
+        .background {
+            KeyboardEventView(isEnabled: hasLoadedDocument && editingCell == .none && !filterFieldFocused) { event in
+                handleGridKeyDown(event)
+            }
+        }
         .contentShape(Rectangle())
+        .focusedSceneValue(\.csvViewerActions, viewerActions)
         .onTapGesture {
             // Commit edit when clicking outside cells
             if editingCell != .none {
@@ -708,6 +871,9 @@ struct ContentView: View {
         .onAppear {
             recentFiles = loadRecentFiles()
         }
+        .onOpenURL { url in
+            openCSVURL(url)
+        }
         .onChange(of: fontSize) {
             columnWidths = computeColumnWidths(columns: columns, rows: rows)
         }
@@ -716,12 +882,17 @@ struct ContentView: View {
         }
         .onChange(of: rows) {
             updateSearchResults()
+            normalizeActiveCellForFilter()
         }
         .onChange(of: columns) {
             updateSearchResults()
+            normalizeActiveCellForFilter()
         }
         .onChange(of: selectedColumns) {
             updateSearchResults()
+        }
+        .onChange(of: filterText) {
+            normalizeActiveCellForFilter()
         }
     }
 
@@ -757,12 +928,56 @@ struct ContentView: View {
     }
 
     private func openCSVURL(_ url: URL) {
+        guard url.pathExtension.lowercased() == "csv" else {
+            errorTitle = "Unsupported File"
+            errorMessage = "CSV Viewer can open .csv files."
+            showErrorAlert = true
+            return
+        }
+
         if shouldPreview(url: url) {
             pendingOpenURL = url
             showLargeFileAlert = true
         } else {
             loadCSV(from: url, limitRows: nil)
         }
+    }
+
+    private func handleFileDrop(providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) }) else {
+            return false
+        }
+
+        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+            guard let droppedURL = droppedFileURL(from: item) else { return }
+            DispatchQueue.main.async {
+                guard droppedURL.pathExtension.lowercased() == "csv" else {
+                    errorTitle = "Unsupported File"
+                    errorMessage = "Please drop a .csv file."
+                    showErrorAlert = true
+                    return
+                }
+                openCSVURL(droppedURL)
+            }
+        }
+
+        return true
+    }
+
+    private func droppedFileURL(from item: NSSecureCoding?) -> URL? {
+        if let url = item as? URL {
+            return url
+        }
+        if let nsURL = item as? NSURL {
+            return nsURL as URL
+        }
+        if let data = item as? Data {
+            return NSURL(absoluteURLWithDataRepresentation: data, relativeTo: nil) as URL?
+        }
+        if let string = item as? String {
+            return URL(string: string)
+        }
+        return nil
     }
 
     private func loadCSV(from url: URL, limitRows: Int?) {
@@ -821,6 +1036,8 @@ struct ContentView: View {
             selectedColumns = []
             lastSelectedRow = nil
             lastSelectedColumn = nil
+            filterText = ""
+            activeCell = rows.isEmpty || columns.isEmpty ? nil : SearchMatch(row: 0, column: 0)
             columnWidths = computeColumnWidths(columns: columns, rows: rows)
             sortColumn = nil
             sortAscending = true
@@ -854,6 +1071,8 @@ struct ContentView: View {
         undoStack = []
         redoStack = []
         isPreview = false
+        filterText = ""
+        activeCell = nil
         // Clear dirty state when clearing data
         appState.markClean()
         appState.currentFileName = "Untitled"
@@ -1135,7 +1354,63 @@ struct ContentView: View {
         return widths
     }
 
+    private func filterRange(in value: String) -> NSRange? {
+        let query = filterText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return nil }
+
+        let nsValue = value as NSString
+        let range = nsValue.range(
+            of: query,
+            options: [.caseInsensitive, .diacriticInsensitive],
+            range: NSRange(location: 0, length: nsValue.length)
+        )
+        return range.location == NSNotFound ? nil : range
+    }
+
+    private func filterHighlightedAttributedString(for value: String, row: Int, column: Int) -> AttributedString {
+        let nsValue = value as NSString
+        let baseColor = nsCellTextColor(row: row, column: column)
+        let attributed = NSMutableAttributedString(
+            string: value,
+            attributes: [
+                .foregroundColor: baseColor,
+                .font: NSFont.systemFont(ofSize: fontSize)
+            ]
+        )
+
+        let query = filterText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            return AttributedString(attributed)
+        }
+
+        var searchRange = NSRange(location: 0, length: nsValue.length)
+        while searchRange.location < nsValue.length {
+            let match = nsValue.range(
+                of: query,
+                options: [.caseInsensitive, .diacriticInsensitive],
+                range: searchRange
+            )
+            guard match.location != NSNotFound, match.length > 0 else { break }
+
+            attributed.addAttributes(
+                [
+                    .backgroundColor: NSColor.systemYellow.withAlphaComponent(0.72),
+                    .foregroundColor: NSColor.black
+                ],
+                range: match
+            )
+
+            let nextLocation = match.location + match.length
+            searchRange = NSRange(location: nextLocation, length: nsValue.length - nextLocation)
+        }
+
+        return AttributedString(attributed)
+    }
+
     private func cellSelectionColor(row: Int, column: Int) -> Color {
+        if focusedDataCell == SearchMatch(row: row, column: column) {
+            return Color.accentColor.opacity(0.28)
+        }
         let rowSelected = selectedRows.contains(row)
         let columnSelected = selectedColumns.contains(column)
         if rowSelected || columnSelected {
@@ -1152,6 +1427,13 @@ struct ContentView: View {
             return Color.accentColor.opacity(0.6)
         }
         return Color.clear
+    }
+
+    private func nsCellTextColor(row: Int, column: Int) -> NSColor {
+        if selectedRows.contains(row) || selectedColumns.contains(column) {
+            return colorScheme == .light ? .black : .white
+        }
+        return .labelColor
     }
 
     private func cellSelectionTextColor(row: Int, column: Int) -> Color {
@@ -1261,9 +1543,14 @@ struct ContentView: View {
                 selectedColumns.insert(index)
             }
         } else {
-            selectedColumns = [index]
+            // Plain click toggles off when this is the only selected column.
+            if selectedColumns == [index] {
+                selectedColumns = []
+            } else {
+                selectedColumns = [index]
+            }
         }
-        lastSelectedColumn = index
+        lastSelectedColumn = selectedColumns.isEmpty ? nil : index
     }
 
     private func handleRowSelection(at index: Int) {
@@ -1290,9 +1577,14 @@ struct ContentView: View {
                 selectedRows.insert(index)
             }
         } else {
-            selectedRows = [index]
+            // Plain click toggles off when this is the only selected row.
+            if selectedRows == [index] {
+                selectedRows = []
+            } else {
+                selectedRows = [index]
+            }
         }
-        lastSelectedRow = index
+        lastSelectedRow = selectedRows.isEmpty ? nil : index
     }
 
     // MARK: - Cell Editing Functions
@@ -1418,6 +1710,86 @@ struct ContentView: View {
         NSApp.currentEvent?.modifierFlags ?? []
     }
 
+    private func handleGridKeyDown(_ event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if modifiers.contains(.command) || modifiers.contains(.option) || modifiers.contains(.control) {
+            return false
+        }
+
+        switch event.keyCode {
+        case 123: // left arrow
+            moveActiveCell(rowOffset: 0, columnOffset: -1)
+        case 124: // right arrow
+            moveActiveCell(rowOffset: 0, columnOffset: 1)
+        case 125: // down arrow
+            moveActiveCell(rowOffset: 1, columnOffset: 0)
+        case 126: // up arrow
+            moveActiveCell(rowOffset: -1, columnOffset: 0)
+        case 115: // home
+            moveActiveCellToColumn(0)
+        case 119: // end
+            moveActiveCellToColumn(max(0, columns.count - 1))
+        case 116: // page up
+            moveActiveCell(rowOffset: -10, columnOffset: 0)
+        case 121: // page down
+            moveActiveCell(rowOffset: 10, columnOffset: 0)
+        case 48: // tab
+            moveActiveCell(rowOffset: 0, columnOffset: modifiers.contains(.shift) ? -1 : 1)
+        case 36, 76: // return, enter
+            if let activeCell = focusedDataCell {
+                startEditing(.dataCell(row: activeCell.row, column: activeCell.column))
+            }
+        case 53: // escape
+            activeCell = nil
+            selectedRows = []
+            selectedColumns = []
+            lastSelectedRow = nil
+            lastSelectedColumn = nil
+        default:
+            return false
+        }
+        return true
+    }
+
+    private func moveActiveCell(rowOffset: Int, columnOffset: Int) {
+        guard !filteredRowIndices.isEmpty, !columns.isEmpty else {
+            activeCell = nil
+            return
+        }
+
+        let current = focusedDataCell ?? SearchMatch(row: filteredRowIndices[0], column: 0)
+        let visiblePosition = filteredRowIndices.firstIndex(of: current.row) ?? 0
+        let nextVisiblePosition = max(0, min(filteredRowIndices.count - 1, visiblePosition + rowOffset))
+        let nextRow = filteredRowIndices[nextVisiblePosition]
+        let nextColumn = max(0, min(columns.count - 1, current.column + columnOffset))
+        activeCell = SearchMatch(row: nextRow, column: nextColumn)
+    }
+
+    private func moveActiveCellToColumn(_ column: Int) {
+        guard !filteredRowIndices.isEmpty, !columns.isEmpty else {
+            activeCell = nil
+            return
+        }
+        let currentRow = focusedDataCell?.row ?? filteredRowIndices[0]
+        let row = filteredRowIndices.contains(currentRow) ? currentRow : filteredRowIndices[0]
+        activeCell = SearchMatch(row: row, column: max(0, min(columns.count - 1, column)))
+    }
+
+    private func normalizeActiveCellForFilter() {
+        guard !filteredRowIndices.isEmpty, !columns.isEmpty else {
+            activeCell = nil
+            return
+        }
+
+        if let activeCell,
+           filteredRowIndices.contains(activeCell.row),
+           columns.indices.contains(activeCell.column) {
+            return
+        }
+
+        activeCell = SearchMatch(row: filteredRowIndices[0], column: 0)
+    }
+
     private func adjustFontSize(_ delta: CGFloat) {
         let updated = fontSize + delta
         fontSize = max(Constants.minFontSize, min(Constants.maxFontSize, updated))
@@ -1429,10 +1801,10 @@ struct ContentView: View {
         let columnIndices: [Int]
 
         if selectedRows.isEmpty && selectedColumns.isEmpty {
-            rowIndices = Array(rows.indices)
+            rowIndices = filteredRowIndices
             columnIndices = Array(columns.indices)
         } else {
-            rowIndices = selectedRows.isEmpty ? Array(rows.indices) : selectedRows.sorted()
+            rowIndices = selectedRows.isEmpty ? filteredRowIndices : selectedRows.sorted()
             columnIndices = selectedColumns.isEmpty ? Array(columns.indices) : selectedColumns.sorted()
         }
 
@@ -1521,5 +1893,112 @@ private struct HorizontalOffsetKey: PreferenceKey {
 
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
+    }
+}
+
+private struct KeyboardEventView: NSViewRepresentable {
+    let isEnabled: Bool
+    let onKeyDown: (NSEvent) -> Bool
+
+    func makeNSView(context: Context) -> KeyCatcherView {
+        let view = KeyCatcherView()
+        view.onKeyDown = onKeyDown
+        view.isEnabled = isEnabled
+        return view
+    }
+
+    func updateNSView(_ nsView: KeyCatcherView, context: Context) {
+        nsView.onKeyDown = onKeyDown
+        nsView.isEnabled = isEnabled
+        if isEnabled {
+            DispatchQueue.main.async {
+                if let window = nsView.window,
+                   !(window.firstResponder is NSTextView) {
+                    window.makeFirstResponder(nsView)
+                }
+            }
+        }
+    }
+
+    final class KeyCatcherView: NSView {
+        var isEnabled = false
+        var onKeyDown: ((NSEvent) -> Bool)?
+
+        override var acceptsFirstResponder: Bool {
+            true
+        }
+
+        override func keyDown(with event: NSEvent) {
+            guard isEnabled, onKeyDown?(event) == true else {
+                super.keyDown(with: event)
+                return
+            }
+        }
+    }
+}
+
+private struct CommandTooltipModifier: ViewModifier {
+    enum Anchor {
+        case leading
+        case centered
+        case trailing
+    }
+
+    let text: String
+    let anchor: Anchor
+    @State private var isHovering = false
+
+    private var overlayAlignment: Alignment {
+        switch anchor {
+        case .leading:
+            return .bottomLeading
+        case .centered:
+            return .bottom
+        case .trailing:
+            return .bottomTrailing
+        }
+    }
+
+    private var horizontalOffset: CGFloat {
+        switch anchor {
+        case .leading:
+            return 8
+        case .centered:
+            return 0
+        case .trailing:
+            return -8
+        }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: overlayAlignment) {
+                if isHovering {
+                    Text(text)
+                        .font(.system(size: 12, weight: .medium))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.secondary.opacity(0.35), lineWidth: 1)
+                        )
+                        .offset(x: horizontalOffset, y: 22)
+                        .frame(minWidth: 140, alignment: .leading)
+                        .zIndex(1000)
+                        .allowsHitTesting(false)
+                }
+            }
+            .onHover { hovering in
+                withAnimation(.easeOut(duration: 0.08)) {
+                    isHovering = hovering
+                }
+            }
+    }
+}
+
+private extension View {
+    func commandTooltip(_ text: String, anchor: CommandTooltipModifier.Anchor = .centered) -> some View {
+        modifier(CommandTooltipModifier(text: text, anchor: anchor))
     }
 }
